@@ -170,6 +170,41 @@ app.post('/transactions', function(request, response, next) {
   });
 });
 
+//response.body
+app.post('/newPurchase', function(request, response, next) {
+
+
+  let data = {
+    account_id: request.body.account_id,
+    amount: request.body.amount,
+    date: request.body.date,
+    name: request.body.name,
+    donation: generateDonation(request.body.amount)
+  }
+
+
+  response.json(data);
+
+  return db
+    .collection(`all_transactions`)
+    .doc(request.body.userUid)
+    .collection('user_transactions')
+    .doc(request.body.transaction_id)
+    .set(data)
+
+  
+
+});
+
+function generateDonation(amount){
+
+  amount = +amount;
+
+  if (amount < 0 || amount % 1 === 0) return 0;
+
+  return +((1 - (amount % 1)).toFixed(2));
+}
+
 
 function addTransactions(transactions, uid) {
 
@@ -184,18 +219,17 @@ function addTransactions(transactions, uid) {
       account_id: transaction.account_id,
       amount: transaction.amount,
       date: transaction.date,
-      name: transaction.name
+      name: transaction.name,
+      donation: generateDonation(transaction.amount)
     }
 
     return db
       .collection(`all_transactions`)
-      .doc(`${uid}`)
+      .doc(uid)
       .collection(`user_transactions`)
       .doc(transaction.transaction_id)
       .set(data);
-
   })
-
 }
 
 
