@@ -169,11 +169,7 @@ app.post('/newPurchase', function(request, response, next) {
     donation: generateDonation(request.body.amount)
   };
 
-
   response.json(data);
-
-  console.log('about to call updateMonthlyDonations', request.body.date.substring(0, 7), request.body.userUid);
-
   singleUpdateMonthlyDonations(request.body.date.substring(0, 7), request.body.userUid, data.donation);
 
   return db
@@ -187,10 +183,9 @@ app.post('/newPurchase', function(request, response, next) {
 function generateDonation(amount){
 
   amount = +amount;
-
   if (amount < 0 || amount % 1 === 0) return 0;
-
   return +((1 - (amount % 1)).toFixed(2));
+
 }
 
 
@@ -231,18 +226,12 @@ function addTransactions(transactions, uid) {
 
 function bulkUpdateMonthlyDonations(monthArr, uid){
 
-  console.log('in bulkUpdateMonthlyDonations', monthArr, uid);
-
   let promiseArr = [];
   let donationArr = [];
   monthArr = Object.keys(monthArr);
 
-
   monthArr.forEach((month, index) => {
 
-    console.log('in forEach', month, index);
-    
-    
     db.collection('all_transactions')
       .doc(uid)
       .collection(`user_transactions`)
@@ -251,13 +240,11 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
       .then(snapshot => {
               let donation = 0;
               snapshot.forEach(doc => {
-                console.log('in snap shot foreach', doc.data().donation);
                  donation += doc.data().donation;
                });
                return donation;
       })
       .then(donation => {
-        console.log('in final then', donation, uid, monthArr[index]);
         db.collection('all_donations')
           .doc(uid)
           .collection(`user_donations`)
@@ -276,8 +263,6 @@ function singleUpdateMonthlyDonations(month, uid, donation){
       .doc(month)
       .get()
       .then(snapshot => {
-        console.log('snapshot', snapshot);
-        console.log('snapshot.data()', snapshot.data());
 
         if (snapshot.data()){
 
