@@ -169,8 +169,8 @@ app.post('/newPurchase', function(request, response, next) {
     donation: generateDonation(request.body.amount)
   };
 
-
   response.json(data);
+  singleUpdateMonthlyDonations(request.body.date.substring(0, 7), request.body.userUid, data.donation);
 
   return db
     .collection(`all_transactions`)
@@ -183,10 +183,9 @@ app.post('/newPurchase', function(request, response, next) {
 function generateDonation(amount){
 
   amount = +amount;
-
   if (amount < 0 || amount % 1 === 0) return 0;
-
   return +((1 - (amount % 1)).toFixed(2));
+
 }
 
 
@@ -196,6 +195,7 @@ function addTransactions(transactions, uid) {
     return +transaction.amount > 0 && +transaction.amount % 1 !== 0;
   });
 
+  let monthArr = {};
 
   filteredData.forEach(transaction => {
 
@@ -207,13 +207,82 @@ function addTransactions(transactions, uid) {
       donation: generateDonation(transaction.amount)
     };
 
+    let month = data.date.substring(0, 7);
+
+    if(!monthArr[month]) monthArr[month] = true;
+
     return db
       .collection(`all_transactions`)
-      .doc(`${uid}`)
+      .doc(uid)
       .collection(`user_transactions`)
       .doc(transaction.transaction_id)
       .set(data);
   });
+
+  bulkUpdateMonthlyDonations(monthArr, uid);
+
+}
+
+
+function bulkUpdateMonthlyDonations(monthArr, uid){
+
+  let promiseArr = [];
+  let donationArr = [];
+  monthArr = Object.keys(monthArr);
+
+  monthArr.forEach((month, index) => {
+
+    db.collection('all_transactions')
+      .doc(uid)
+      .collection(`user_transactions`)
+      .where('date', '>', monthArr[index]).where('date', '<', `${monthArr[index]}-32`)
+      .get()
+      .then(snapshot => {
+              let donation = 0;
+              snapshot.forEach(doc => {
+                 donation += doc.data().donation;
+               });
+               return donation;
+      })
+      .then(donation => {
+        db.collection('all_donations')
+          .doc(uid)
+          .collection(`user_donations`)
+          .doc(monthArr[index])
+          .set({totalDonations: +(donation.toFixed(2))})
+      })
+  });
+
+}
+
+function singleUpdateMonthlyDonations(month, uid, donation){
+
+  db.collection('all_donations')
+      .doc(uid)
+      .collection(`user_donations`)
+      .doc(month)
+      .get()
+      .then(snapshot => {
+
+        if (snapshot.data()){
+
+          let newDonation = snapshot.data().totalDonations + donation;
+          db.collection('all_donations')
+            .doc(uid)
+            .collection(`user_donations`)
+            .doc(month)
+            .set({totalDonations: +(newDonation.toFixed(2))})
+        } else {
+          db.collection('all_donations')
+            .doc(uid)
+            .collection(`user_donations`)
+            .doc(month)
+            .set({totalDonations: +(donation.toFixed(2))})
+
+        }
+        
+      })
+
 }
 
 
