@@ -191,8 +191,14 @@ function generateDonation(amount){
 
 function addTransactions(transactions, uid) {
 
-  let filteredData = transactions.transactions.filter(transaction => {
-    return +transaction.amount > 0 && +transaction.amount % 1 !== 0;
+  let filteredData = transactions.transactions.map(transaction => {
+    if (+transaction.amount % 1 === 0){
+      transaction.amount = 0.01 + transaction.amount;
+    }
+    if (+transaction.amount < 0){
+      transaction.amount = +transaction.amount * -1; 
+    }
+    return transaction;
   });
 
   let monthArr = {};
@@ -228,14 +234,21 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
 
   let promiseArr = [];
   let donationArr = [];
+
+  let transactionCol = db.collection('all_transactions')
+    .doc(uid)
+    .collection(`user_transactions`);
+
+
+  let donationCol = db.collection('all_donations')
+    .doc(uid)
+    .collection(`user_donations`);
+
   monthArr = Object.keys(monthArr);
 
   monthArr.forEach((month, index) => {
 
-    db.collection('all_transactions')
-      .doc(uid)
-      .collection(`user_transactions`)
-      .where('date', '>', monthArr[index]).where('date', '<', `${monthArr[index]}-32`)
+    transactionCol.where('date', '>', monthArr[index]).where('date', '<', `${monthArr[index]}-32`)
       .get()
       .then(snapshot => {
               let donation = 0;
@@ -245,11 +258,12 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
                return donation;
       })
       .then(donation => {
-        db.collection('all_donations')
-          .doc(uid)
-          .collection(`user_donations`)
-          .doc(monthArr[index])
+
+        donationCol.doc(monthArr[index])
           .set({totalDonations: +(donation.toFixed(2))})
+
+        updateTotalDonations(donation, uid);
+
       })
   });
 
@@ -257,31 +271,35 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
 
 function singleUpdateMonthlyDonations(month, uid, donation){
 
-  db.collection('all_donations')
-      .doc(uid)
-      .collection(`user_donations`)
-      .doc(month)
-      .get()
-      .then(snapshot => {
 
-        if (snapshot.data()){
+  let monthDoc = db.collection('all_donations')
+    .doc(uid)
+    .collection(`user_donations`)
+    .doc(month);
 
-          let newDonation = snapshot.data().totalDonations + donation;
-          db.collection('all_donations')
-            .doc(uid)
-            .collection(`user_donations`)
-            .doc(month)
-            .set({totalDonations: +(newDonation.toFixed(2))})
-        } else {
-          db.collection('all_donations')
-            .doc(uid)
-            .collection(`user_donations`)
-            .doc(month)
-            .set({totalDonations: +(donation.toFixed(2))})
+  monthDoc.get()
+  .then(snapshot => {
+    let monthlyDonation = snapshot.data() ? snapshot.data().totalDonations + donation : donation;
+    monthDoc.set({totalDonations: +(monthlyDonation.toFixed(2))})        
+  })
 
-        }
-        
-      })
+  updateTotalDonations(donation, uid);
+
+}
+
+
+function updateTotalDonations(donation, uid){
+
+  let userDoc = db.collection('users').doc(uid);
+
+  db.runTransaction(t => {
+    return t.get(userDoc)
+        .then(doc => {
+            var newDonationAmount =  doc.data().totalDonations ? +(doc.data().totalDonations) + donation : donation;
+            newDonationAmount = +(newDonationAmount.toFixed(2));
+            t.update(userDoc, { totalDonations: newDonationAmount });
+        });
+  });
 
 }
 
