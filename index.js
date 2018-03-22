@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const moment = require('moment');
 const plaid = require('plaid');
 const firebase = require('firebase');
+const uuidv4 = require('uuid/v4');
 require('firebase/firestore');
 
 
@@ -152,33 +153,60 @@ app.post('/transactions', function(request, response, next) {
       });
     }
     console.log('pulled ' + transactionsResponse.transactions.length + ' transactions');
-    addTransactions(transactionsResponse, request.body.uid);
+    addBulkTransactions(transactionsResponse, request.body.uid);
 
     response.json(transactionsResponse);
   });
 });
 
-//response.body
+
+//benevocent defined routes
+
 app.post('/newPurchase', function(request, response, next) {
 
-  let data = {
-    account_id: request.body.account_id,
-    amount: request.body.amount,
-    date: request.body.date,
-    name: request.body.name,
-    donation: generateDonation(request.body.amount)
-  };
-
-  response.json(data);
-  singleUpdateMonthlyDonations(request.body.date.substring(0, 7), request.body.userUid, data.donation);
-
-  return db
-    .collection(`all_transactions`)
-    .doc(`${request.body.userUid}`)
-    .collection('user_transactions')
-    .doc(request.body.transaction_id)
-    .set(data);
+  let trans = addSingleTransaction(request.body);
+  response.json(trans);
+  
 });
+
+
+//seeding routes
+app.get('/charities', function(request, response, next) {
+
+  let charities = ['Bill and Melinda Gates Foundation', 'Doctors Without Borders', 'World Wildlife Fund', '	UNICEF', 'American Red Cross', 'Wounded Warrior Project', 'American Heart Association', 'Boys and Girls Clubs of America'];
+
+  let uidArr = charities.map(() => uuidv4());
+  let charityCol = db.collection('charities');
+
+  charities.forEach((charity, idx) => {
+    charityCol.doc(uidArr[idx]).set({'name': charity, totalDonations: 0, uid: uidArr[idx]})
+  })
+
+  response.sendStatus(200);
+
+});
+
+
+app.get('/plants', function(request, response, next) {
+  let plantCol = db.collection('plants');
+
+  plantCol.doc('carrot').set({'name': 'carrot', 'unlockValue': null});
+  plantCol.doc('aubergine').set({'name': 'aubergine', 'unlockValue': 1});
+  plantCol.doc('radish').set({'name': 'radish', 'unlockValue': 2});
+  plantCol.doc('broccoli').set({'name': 'broccoli', 'unlockValue': 3});
+  plantCol.doc('grapes').set({'name': 'grapes', 'unlockValue': 4});
+  plantCol.doc('onion').set({'name': 'onion', 'unlockValue': 5});
+  plantCol.doc('peas').set({'name': 'peas', 'unlockValue': 6});
+  plantCol.doc('pumpkin').set({'name': 'pumpkin', 'unlockValue': 7});
+  plantCol.doc('strawberry').set({'name': 'strawberry', 'unlockValue': 8});
+
+  response.sendStatus(200);
+
+});
+
+
+
+
 
 function generateDonation(amount){
 
@@ -189,7 +217,7 @@ function generateDonation(amount){
 }
 
 
-function addTransactions(transactions, uid) {
+function addBulkTransactions(transactions, uid) {
 
   let filteredData = transactions.transactions.map(transaction => {
     if (+transaction.amount % 1 === 0){
@@ -230,19 +258,36 @@ function addTransactions(transactions, uid) {
 }
 
 
+function addSingleTransaction(body){
+
+  let data = {
+    account_id: body.account_id,
+    amount: body.amount,
+    date: body.date,
+    name: body.name,
+    donation: generateDonation(body.amount)
+  };
+
+  singleUpdateMonthlyDonations(data.date.substring(0, 7), body.userUid, data.donation);
+
+  db
+    .collection(`all_transactions`)
+    .doc(`${body.userUid}`)
+    .collection('user_transactions')
+    .doc(body.transaction_id)
+    .set(data);
+
+  return data;
+
+}
+
+
 function bulkUpdateMonthlyDonations(monthArr, uid){
 
   let promiseArr = [];
   let donationArr = [];
-
-  let transactionCol = db.collection('all_transactions')
-    .doc(uid)
-    .collection(`user_transactions`);
-
-
-  let donationCol = db.collection('all_donations')
-    .doc(uid)
-    .collection(`user_donations`);
+  let transactionCol = db.collection('all_transactions').doc(uid).collection(`user_transactions`);
+  let donationCol = db.collection('all_donations').doc(uid).collection(`user_donations`);
 
   monthArr = Object.keys(monthArr);
 
@@ -263,6 +308,7 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
           .set({totalDonations: +(donation.toFixed(2))})
 
         updateTotalDonations(donation, uid);
+        distributeMoney(donation, uid);
 
       })
   });
@@ -270,7 +316,6 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
 }
 
 function singleUpdateMonthlyDonations(month, uid, donation){
-
 
   let monthDoc = db.collection('all_donations')
     .doc(uid)
@@ -284,6 +329,7 @@ function singleUpdateMonthlyDonations(month, uid, donation){
   })
 
   updateTotalDonations(donation, uid);
+  distributeMoney(donation, uid);
 
 }
 
@@ -301,6 +347,26 @@ function updateTotalDonations(donation, uid){
         });
   });
 
+}
+
+function distributeMoney(donation, uid){
+
+  db.collection('distributions').doc(uid).get()
+  .then(doc => {
+    let keys = Object.keys(doc.data());
+
+    keys.forEach((key) => {
+      db.runTransaction(t => {
+        return t.get(db.collection('charities').doc(key))
+        .then(charityDoc => {
+          let existingDonationAmount =  charityDoc.data().totalDonations ? +(charityDoc.data().totalDonations) : 0;
+          let newDonationAmount = existingDonationAmount + donation * doc.data()[key];
+          newDonationAmount = +(newDonationAmount.toFixed(4));
+          t.update(db.collection('charities').doc(key), { totalDonations: newDonationAmount });
+        });
+      })
+    })
+  })
 }
 
 
