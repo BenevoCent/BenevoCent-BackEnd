@@ -153,41 +153,29 @@ app.post('/transactions', function(request, response, next) {
       });
     }
     console.log('pulled ' + transactionsResponse.transactions.length + ' transactions');
-    addTransactions(transactionsResponse, request.body.uid);
+    addBulkTransactions(transactionsResponse, request.body.uid);
 
     response.json(transactionsResponse);
   });
 });
 
-//response.body
+
+//benevocent defined routes
+
 app.post('/newPurchase', function(request, response, next) {
 
-  let data = {
-    account_id: request.body.account_id,
-    amount: request.body.amount,
-    date: request.body.date,
-    name: request.body.name,
-    donation: generateDonation(request.body.amount)
-  };
-
-  response.json(data);
-  singleUpdateMonthlyDonations(request.body.date.substring(0, 7), request.body.userUid, data.donation);
-
-  return db
-    .collection(`all_transactions`)
-    .doc(`${request.body.userUid}`)
-    .collection('user_transactions')
-    .doc(request.body.transaction_id)
-    .set(data);
+  let trans = addSingleTransaction(request.body);
+  response.json(trans);
+  
 });
 
 
+//seeding routes
 app.get('/charities', function(request, response, next) {
 
   let charities = ['Bill and Melinda Gates Foundation', 'Doctors Without Borders', 'World Wildlife Fund', '	UNICEF', 'American Red Cross', 'Wounded Warrior Project', 'American Heart Association', 'Boys and Girls Clubs of America'];
 
   let uidArr = charities.map(() => uuidv4());
-
   let charityCol = db.collection('charities');
 
   charities.forEach((charity, idx) => {
@@ -217,6 +205,9 @@ app.get('/plants', function(request, response, next) {
 });
 
 
+
+
+
 function generateDonation(amount){
 
   amount = +amount;
@@ -226,7 +217,7 @@ function generateDonation(amount){
 }
 
 
-function addTransactions(transactions, uid) {
+function addBulkTransactions(transactions, uid) {
 
   let filteredData = transactions.transactions.map(transaction => {
     if (+transaction.amount % 1 === 0){
@@ -267,19 +258,36 @@ function addTransactions(transactions, uid) {
 }
 
 
+function addSingleTransaction(body){
+
+  let data = {
+    account_id: body.account_id,
+    amount: body.amount,
+    date: body.date,
+    name: body.name,
+    donation: generateDonation(body.amount)
+  };
+
+  singleUpdateMonthlyDonations(data.date.substring(0, 7), body.userUid, data.donation);
+
+  db
+    .collection(`all_transactions`)
+    .doc(`${body.userUid}`)
+    .collection('user_transactions')
+    .doc(body.transaction_id)
+    .set(data);
+
+  return data;
+
+}
+
+
 function bulkUpdateMonthlyDonations(monthArr, uid){
 
   let promiseArr = [];
   let donationArr = [];
-
-  let transactionCol = db.collection('all_transactions')
-    .doc(uid)
-    .collection(`user_transactions`);
-
-
-  let donationCol = db.collection('all_donations')
-    .doc(uid)
-    .collection(`user_donations`);
+  let transactionCol = db.collection('all_transactions').doc(uid).collection(`user_transactions`);
+  let donationCol = db.collection('all_donations').doc(uid).collection(`user_donations`);
 
   monthArr = Object.keys(monthArr);
 
@@ -308,7 +316,6 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
 }
 
 function singleUpdateMonthlyDonations(month, uid, donation){
-
 
   let monthDoc = db.collection('all_donations')
     .doc(uid)
