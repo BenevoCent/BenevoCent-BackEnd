@@ -217,48 +217,6 @@ app.get('/plants', function(request, response, next) {
 });
 
 
-app.post('/distributeMoney', function(request, response, next) {
-
-  // let month;
-
-  // if (request.month){
-  //   month = request.month;
-  // } else {
-  //   let date = new Date();
-  //   month = `${date.getFullYear()}-0${date.getMonth() + 1}`;
-  // }
-
-  // let monthDoc = db.collection('all_donations')
-  //   .doc(request.uid)
-  //   .collection('user_donations')
-  //   .doc(month);
-
-  // let distributionDoc = db.collection('all_distributions')
-  //   .doc(request.uid)
-   
-
-  // monthDoc.get()
-  // .then((snapshot) => {
-  //   if(snapshot.data().totalDonations){
-
-  //   }
-
-  // })
-
-
-  // .get()
-  // .then((snapshot) => {
-
-  //   snapshot.forEach(doc => {
-  //     console.log('the data', doc.data());
-  //   });
-
-  // })
-
-  // response.sendStatus(200);
- 
-});
-
 function generateDonation(amount){
 
   amount = +amount;
@@ -342,6 +300,7 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
           .set({totalDonations: +(donation.toFixed(2))})
 
         updateTotalDonations(donation, uid);
+        distributeMoney(donation, uid);
 
       })
   });
@@ -363,6 +322,7 @@ function singleUpdateMonthlyDonations(month, uid, donation){
   })
 
   updateTotalDonations(donation, uid);
+  distributeMoney(donation, uid);
 
 }
 
@@ -382,9 +342,25 @@ function updateTotalDonations(donation, uid){
 
 }
 
+function distributeMoney(donation, uid){
 
-var query = db.collection('cities').where('state', '==', 'CA');
+  db.collection('distributions').doc(uid).get()
+  .then(doc => {
+    let keys = Object.keys(doc.data());
 
+    keys.forEach((key) => {
+      db.runTransaction(t => {
+        return t.get(db.collection('charities').doc(key))
+        .then(charityDoc => {
+          let existingDonationAmount =  charityDoc.data().totalDonations ? +(charityDoc.data().totalDonations) : 0;
+          let newDonationAmount = existingDonationAmount + donation * doc.data()[key];
+          newDonationAmount = +(newDonationAmount.toFixed(4));
+          t.update(db.collection('charities').doc(key), { totalDonations: newDonationAmount });
+        });
+      })
+    })
+  })
+}
 
 
 const server = app.listen(APP_PORT, function() {
