@@ -208,7 +208,7 @@ app.get('/plants', function(request, response, next) {
 app.post('/newGarden', (request, response) => {
 
   generateEmptyGarden(request.body.month, request.body.uid);
-  
+  response.sendStatus(200);
 })
 
 
@@ -373,12 +373,13 @@ function distributeMoney(donation, uid){
   })
 }
 
-function generateEmptyGarden(month, uid){
+function generateEmptyGarden(specifiedMonth, uid){
+
 
   let date = new Date();
-  let month = !month ? `${date.getFullYear()}-0${date.getMonth() + 1}` : month;
+  let month = !specifiedMonth ? `${date.getFullYear()}-0${date.getMonth() + 1}` : specifiedMonth;
 
-  let newGardenDoc = db.collection('gardens')
+  db.collection('gardens')
     .doc(uid)
     .collection('user_gardens')
     .doc(month)
