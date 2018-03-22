@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const moment = require('moment');
 const plaid = require('plaid');
 const firebase = require('firebase');
+const uuidv4 = require('uuid/v4');
 require('firebase/firestore');
 
 
@@ -180,6 +181,84 @@ app.post('/newPurchase', function(request, response, next) {
     .set(data);
 });
 
+
+app.get('/charities', function(request, response, next) {
+
+  let charities = ['Bill and Melinda Gates Foundation', 'Doctors Without Borders', 'World Wildlife Fund', '	UNICEF', 'American Red Cross', 'Wounded Warrior Project', 'American Heart Association', 'Boys and Girls Clubs of America'];
+
+  let uidArr = charities.map(() => uuidv4());
+
+  let charityCol = db.collection('charities');
+
+  charities.forEach((charity, idx) => {
+    charityCol.doc(uidArr[idx]).set({'name': charity, totalDonations: 0, uid: uidArr[idx]})
+  })
+
+  response.sendStatus(200);
+
+});
+
+
+app.get('/plants', function(request, response, next) {
+  let plantCol = db.collection('plants');
+
+  plantCol.doc('carrot').set({'name': 'carrot', 'unlockValue': null});
+  plantCol.doc('aubergine').set({'name': 'aubergine', 'unlockValue': 1});
+  plantCol.doc('radish').set({'name': 'radish', 'unlockValue': 2});
+  plantCol.doc('broccoli').set({'name': 'broccoli', 'unlockValue': 3});
+  plantCol.doc('grapes').set({'name': 'grapes', 'unlockValue': 4});
+  plantCol.doc('onion').set({'name': 'onion', 'unlockValue': 5});
+  plantCol.doc('peas').set({'name': 'peas', 'unlockValue': 6});
+  plantCol.doc('pumpkin').set({'name': 'pumpkin', 'unlockValue': 7});
+  plantCol.doc('strawberry').set({'name': 'strawberry', 'unlockValue': 8});
+
+  response.sendStatus(200);
+
+});
+
+
+app.post('/distributeMoney', function(request, response, next) {
+
+  // let month;
+
+  // if (request.month){
+  //   month = request.month;
+  // } else {
+  //   let date = new Date();
+  //   month = `${date.getFullYear()}-0${date.getMonth() + 1}`;
+  // }
+
+  // let monthDoc = db.collection('all_donations')
+  //   .doc(request.uid)
+  //   .collection('user_donations')
+  //   .doc(month);
+
+  // let distributionDoc = db.collection('all_distributions')
+  //   .doc(request.uid)
+   
+
+  // monthDoc.get()
+  // .then((snapshot) => {
+  //   if(snapshot.data().totalDonations){
+
+  //   }
+
+  // })
+
+
+  // .get()
+  // .then((snapshot) => {
+
+  //   snapshot.forEach(doc => {
+  //     console.log('the data', doc.data());
+  //   });
+
+  // })
+
+  // response.sendStatus(200);
+ 
+});
+
 function generateDonation(amount){
 
   amount = +amount;
@@ -302,6 +381,10 @@ function updateTotalDonations(donation, uid){
   });
 
 }
+
+
+var query = db.collection('cities').where('state', '==', 'CA');
+
 
 
 const server = app.listen(APP_PORT, function() {
