@@ -273,9 +273,9 @@ function addSingleTransaction(body){
   };
 
   singleUpdateMonthlyDonations(data.date.substring(0, 7), body.userUid, data.donation);
+ 
 
-  db
-    .collection(`all_transactions`)
+  db.collection(`all_transactions`)
     .doc(`${body.userUid}`)
     .collection('user_transactions')
     .doc(body.transaction_id)
@@ -320,6 +320,7 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
 }
 
 function singleUpdateMonthlyDonations(month, uid, donation){
+
 
   let monthDoc = db.collection('all_donations')
     .doc(uid)
@@ -367,6 +368,8 @@ function distributeMoney(donation, uid){
           let newDonationAmount = existingDonationAmount + donation * doc.data()[key];
           newDonationAmount = +(newDonationAmount.toFixed(4));
           t.update(db.collection('charities').doc(key), { totalDonations: newDonationAmount });
+          updateDonationsByCharity(key, uid, donation);
+
         });
       })
     })
@@ -394,6 +397,27 @@ function generateEmptyGarden(specifiedMonth, uid){
       7: null,
       8: null
     })
+
+}
+
+
+//test this function
+function updateDonationsByCharity(charity, user, donation){
+  let donationByCharityDoc = db.collection('donationsByCharity')
+    .doc(user);
+
+  db.runTransaction(t => {
+    return t.get(donationByCharityDoc)
+        .then(doc => {
+            var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + donation : donation;
+            newDonationAmount = +(newDonationAmount.toFixed(2));
+            t.update(donationByCharityDoc, { [charity]: newDonationAmount });
+        });
+  });
+    
+
+
+  
 
 }
 
