@@ -368,7 +368,7 @@ function distributeMoney(donation, uid){
           let newDonationAmount = existingDonationAmount + donation * doc.data()[key];
           newDonationAmount = +(newDonationAmount.toFixed(4));
           t.update(db.collection('charities').doc(key), { totalDonations: newDonationAmount });
-          updateDonationsByCharity(key, uid, donation * doc.data()[key]);
+          calculateDonationsToCharities(key, uid, donation * doc.data()[key]);
 
         });
       })
@@ -401,25 +401,28 @@ function generateEmptyGarden(specifiedMonth, uid){
 }
 
 
-//test this function
-function updateDonationsByCharity(charity, user, donation){
+function calculateDonationsToCharities(charity, user, donation){
+
+  console.log('in updateDonationsByUser');
+  console.log('charity', charity, 'user', user, 'donation', donation);
+
   
-  let donationByCharityDoc = db.collection('donationsByCharity')
-    .doc(user).collection('user_donations').doc(charity);
+  let donationByCharityDoc = db.collection('donationsToCharities')
+    .doc(charity); //.collection('donations').doc(user);
 
   donationByCharityDoc.get()
   .then((charityDoc) => {
 
     if (!charityDoc.data()){
-      donationByCharityDoc.set({[charity]: donation});
+      donationByCharityDoc.set({[user]: donation});
     } else {
-      
+
       db.runTransaction(t => {
         return t.get(donationByCharityDoc)
             .then(doc => {
                 var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + donation : donation;
                 newDonationAmount = +(newDonationAmount.toFixed(2));
-                t.update(donationByCharityDoc, { [charity]: newDonationAmount });
+                t.update(donationByCharityDoc, { [user]: newDonationAmount });
             });
       });
     }
