@@ -211,6 +211,21 @@ app.post('/newGarden', (request, response) => {
   response.sendStatus(200);
 })
 
+//front end code to get data for community garden
+app.post('/orderData', (request, response) => {
+  let charityRef = db.collection('donationsToCharities').doc(request.body.charity).collection('donationsToCharity');
+
+  charityRef.orderBy('totalDonations').limit(9).get()
+  .then(snapshot => {
+    snapshot.forEach((doc) => {
+      console.log(doc.data());
+    })
+
+    response.send('coolio');
+  })
+
+});
+
 
 function generateDonation(amount){
 
@@ -404,24 +419,23 @@ function generateEmptyGarden(specifiedMonth, uid){
 function calculateDonationsToCharities(charity, user, donation){
 
   console.log('in calculateDonationsToCharities');
-  console.log('charity', charity, 'user', user, 'donation', donation);
 
-  let donationByCharityDoc = db.collection('donationsToCharities')
-    .doc(charity); //.collection('donations').doc(user);
+  let donationsToCharityByUser = db.collection('donationsToCharities')
+    .doc(charity).collection('donationsToCharity').doc(user); //.collection('donations').doc(user);
 
-  donationByCharityDoc.get()
+    donationsToCharityByUser.get()
   .then((charityDoc) => {
 
     if (!charityDoc.data()){
-      donationByCharityDoc.set({[user]: donation});
+      donationsToCharityByUser.set({'totalDonations': donation, 'uid': user});
     } else {
 
       db.runTransaction(t => {
-        return t.get(donationByCharityDoc)
+        return t.get(donationsToCharityByUser)
             .then(doc => {
-                var newDonationAmount =  doc.data()[user] ? +(doc.data()[user]) + donation : donation;
+                var newDonationAmount =  doc.data() ? +(doc.data().totalDonations) + donation : donation;
                 newDonationAmount = +(newDonationAmount.toFixed(2));
-                t.update(donationByCharityDoc, { [user]: newDonationAmount });
+                t.update(donationsToCharityByUser, { 'totalDonations': newDonationAmount });
             });
       });
     }
@@ -431,28 +445,22 @@ function calculateDonationsToCharities(charity, user, donation){
 function storeUserDonationsToCharities(charity, user, donation){
 
   console.log('in storeUserDonationsToCharities');
-  console.log('charity', charity, 'user', user, 'donation', donation);
 
   let donationByUserDoc = db.collection('donationsFromUsers')
-    .doc(user); //.collection('donations').doc(user);
+    .doc(user); 
 
     donationByUserDoc.get()
   .then((userDoc) => {
 
-    console.log('userDoc.data()', userDoc.data());
-
     if (!userDoc.data()){
-      console.log('in if');
       donationByUserDoc.set({[charity]: donation});
     } else {
-      console.log('in else');
 
       db.runTransaction(t => {
         return t.get(donationByUserDoc)
             .then(doc => {
                 var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + donation : donation;
                 newDonationAmount = +(newDonationAmount.toFixed(2));
-                console.log('charity', charity, 'newDonationAmount', newDonationAmount);
                 t.update(donationByUserDoc, { [charity]: newDonationAmount });
             });
       });
