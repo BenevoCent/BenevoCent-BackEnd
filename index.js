@@ -205,7 +205,26 @@ app.get('/plants', function(request, response, next) {
 });
 
 
+app.post('/newGarden', (request, response) => {
 
+  generateEmptyGarden(request.body.month, request.body.uid);
+  response.sendStatus(200);
+})
+
+//front end code to get data for community garden
+app.post('/orderData', (request, response) => {
+  let charityRef = db.collection('donationsToCharities').doc(request.body.charity).collection('donationsToCharity');
+
+  charityRef.orderBy('totalDonations').limit(9).get()
+  .then(snapshot => {
+    snapshot.forEach((doc) => {
+      console.log(doc.data());
+    })
+
+    response.send('coolio');
+  })
+
+});
 
 
 function generateDonation(amount){
@@ -269,9 +288,9 @@ function addSingleTransaction(body){
   };
 
   singleUpdateMonthlyDonations(data.date.substring(0, 7), body.userUid, data.donation);
+ 
 
-  db
-    .collection(`all_transactions`)
+  db.collection(`all_transactions`)
     .doc(`${body.userUid}`)
     .collection('user_transactions')
     .doc(body.transaction_id)
@@ -316,6 +335,7 @@ function bulkUpdateMonthlyDonations(monthArr, uid){
 }
 
 function singleUpdateMonthlyDonations(month, uid, donation){
+
 
   let monthDoc = db.collection('all_donations')
     .doc(uid)
@@ -363,10 +383,92 @@ function distributeMoney(donation, uid){
           let newDonationAmount = existingDonationAmount + donation * doc.data()[key];
           newDonationAmount = +(newDonationAmount.toFixed(4));
           t.update(db.collection('charities').doc(key), { totalDonations: newDonationAmount });
+          calculateDonationsToCharities(key, uid, donation * doc.data()[key]);
+          storeUserDonationsToCharities(key, uid, donation * doc.data()[key]);
         });
       })
     })
   })
+}
+
+function generateEmptyGarden(specifiedMonth, uid){
+
+
+  let date = new Date();
+  let month = !specifiedMonth ? `${date.getFullYear()}-0${date.getMonth() + 1}` : specifiedMonth;
+
+  db.collection('gardens')
+    .doc(uid)
+    .collection('user_gardens')
+    .doc(month)
+    .set({
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+      6: null,
+      7: null,
+      8: null
+    })
+
+}
+
+
+function calculateDonationsToCharities(charity, user, donation){
+
+  console.log('in calculateDonationsToCharities');
+
+  let donationsToCharityByUser = db.collection('donationsToCharities')
+    .doc(charity).collection('donationsToCharity').doc(user); //.collection('donations').doc(user);
+
+    donationsToCharityByUser.get()
+  .then((charityDoc) => {
+
+    if (!charityDoc.data()){
+      donationsToCharityByUser.set({'totalDonations': donation, 'uid': user});
+    } else {
+
+      db.runTransaction(t => {
+        return t.get(donationsToCharityByUser)
+            .then(doc => {
+                var newDonationAmount =  doc.data() ? +(doc.data().totalDonations) + donation : donation;
+                newDonationAmount = +(newDonationAmount.toFixed(2));
+                t.update(donationsToCharityByUser, { 'totalDonations': newDonationAmount });
+            });
+      });
+    }
+  })
+}
+
+function storeUserDonationsToCharities(charity, user, donation){
+
+  console.log('in storeUserDonationsToCharities');
+
+  let donationByUserDoc = db.collection('donationsFromUsers')
+    .doc(user); 
+
+    donationByUserDoc.get()
+  .then((userDoc) => {
+
+    if (!userDoc.data()){
+      donationByUserDoc.set({[charity]: donation});
+    } else {
+
+      db.runTransaction(t => {
+        return t.get(donationByUserDoc)
+            .then(doc => {
+                var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + donation : donation;
+                newDonationAmount = +(newDonationAmount.toFixed(2));
+                t.update(donationByUserDoc, { [charity]: newDonationAmount });
+            });
+      });
+    }
+  })
+
+
+
 }
 
 
