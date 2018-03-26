@@ -7,6 +7,7 @@ const moment = require('moment');
 const plaid = require('plaid');
 const firebase = require('firebase');
 const uuidv4 = require('uuid/v4');
+const axios = require('axios');
 require('firebase/firestore');
 
 
@@ -166,24 +167,41 @@ app.post('/newPurchase', function(request, response, next) {
 
   let trans = addSingleTransaction(request.body);
   response.json(trans);
-  
+
 });
 
 
 //seeding routes
-app.get('/charities', function(request, response, next) {
+app.get('/charities', function (request, response, next) {
+  const charityApiEndpoint = 'https://api.data.charitynavigator.org/v2';
+  const searchType = '/Organizations';
+  const appId = '?app_id=INSERT_APP_ID';
+  const appKey = '&app_key=INSERT_APP_KEY';
+  const extraParameters = '&pageSize=30&rated=true&fundraisingOrgs=true&state=NY&minRating=4&maxRating=4&scopeOfWork=REGIONAL&sort=NAME%3AASC';
+  const url = `${charityApiEndpoint}${searchType}${appId}${appKey}${extraParameters}`;
 
-  let charities = ['Bill and Melinda Gates Foundation', 'Doctors Without Borders', 'World Wildlife Fund', '	UNICEF', 'American Red Cross', 'Wounded Warrior Project', 'American Heart Association', 'Boys and Girls Clubs of America'];
-
-  let uidArr = charities.map(() => uuidv4());
-  let charityCol = db.collection('charities');
-
-  charities.forEach((charity, idx) => {
-    charityCol.doc(uidArr[idx]).set({'name': charity, totalDonations: 0, uid: uidArr[idx]})
-  })
-
-  response.sendStatus(200);
-
+  axios
+    .get(url)
+    .then(charities => {
+      let uidArr = charities.data.map(() => uuidv4());
+      let charityNames = charities.data.map(charity => charity.charityName);
+      charities.data.forEach((charity, idx) => {
+        db
+          .collection('charities')
+          .doc(uidArr[idx])
+          .set({
+            name: charity.charityName,
+            mission: charity.mission,
+            tag: charity.tagLine,
+            url: charity.websiteURL,
+            category: charity.category.categoryName,
+            img: charity.category.image,
+            uid: uidArr[idx]
+          });
+      });
+      response.status(200).send({ charityNames, uidArr });
+    })
+    .catch(err => console.error(err));
 });
 
 
@@ -243,7 +261,7 @@ function addBulkTransactions(transactions, uid) {
       transaction.amount = 0.01 + transaction.amount;
     }
     if (+transaction.amount < 0){
-      transaction.amount = +transaction.amount * -1; 
+      transaction.amount = +transaction.amount * -1;
     }
     return transaction;
   });
@@ -288,7 +306,7 @@ function addSingleTransaction(body){
   };
 
   singleUpdateMonthlyDonations(data.date.substring(0, 7), body.userUid, data.donation);
- 
+
 
   db.collection(`all_transactions`)
     .doc(`${body.userUid}`)
@@ -345,7 +363,7 @@ function singleUpdateMonthlyDonations(month, uid, donation){
   monthDoc.get()
   .then(snapshot => {
     let monthlyDonation = snapshot.data() ? snapshot.data().totalDonations + donation : donation;
-    monthDoc.set({totalDonations: +(monthlyDonation.toFixed(2))})        
+    monthDoc.set({totalDonations: +(monthlyDonation.toFixed(2))})
   })
 
   updateTotalDonations(donation, uid);
@@ -447,7 +465,7 @@ function storeUserDonationsToCharities(charity, user, donation){
   console.log('in storeUserDonationsToCharities');
 
   let donationByUserDoc = db.collection('donationsFromUsers')
-    .doc(user); 
+    .doc(user);
 
     donationByUserDoc.get()
   .then((userDoc) => {
