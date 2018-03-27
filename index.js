@@ -258,26 +258,21 @@ app.post('/orderData', (request, response) => {
 });
 
 app.post('/stripeTransaction', (request, response) => {
-  console.log('in post stripeTransaction');
 
-  const token = request.body.token; // Using Express
+  const token = request.body.token;
+  const charityId = request.body.charityId;
 
-  console.log('token is', token);
-
-  // Charge the user's card:
   stripe.charges.create({
     amount: request.body.amount,
     currency: "usd",
-    description: "Example charge",
+    description: `Benevocent donation to ${request.body.charityName}`,
     source: request.body.token.id,
   }, function(err, charge) {
     console.log('charge', charge);
     console.log('err', err);
+    addDirectDonation(charityId, request.body.userId, request.body.amount);
 
-    // asynchronously called
   });
-
-
 
 })
 
@@ -399,7 +394,8 @@ function singleUpdateMonthlyDonations(month, uid, donation){
 
   monthDoc.get()
   .then(snapshot => {
-    let monthlyDonation = snapshot.data() ? snapshot.data().totalDonations + donation : donation;
+    let monthlyDonation = snapshot.data() ? snapshot.data().totalDonations + +(donation) : +(donation);
+
     monthDoc.set({totalDonations: +(monthlyDonation.toFixed(2))})
   })
 
@@ -413,10 +409,14 @@ function updateTotalDonations(donation, uid){
 
   let userDoc = db.collection('users').doc(uid);
 
+  console.log('donation type', typeof donation);
+
   db.runTransaction(t => {
     return t.get(userDoc)
         .then(doc => {
-            var newDonationAmount =  doc.data().totalDonations ? +(doc.data().totalDonations) + donation : donation;
+          console.log('doc.data().totalDonations', doc.data().totalDonations);
+            var newDonationAmount =  doc.data().totalDonations ? +(doc.data().totalDonations) + +(donation) : +(donation);
+            console.log('newDonationAmount', newDonationAmount, 'typeof', typeof newDonationAmount);
             newDonationAmount = +(newDonationAmount.toFixed(2));
             t.update(userDoc, { totalDonations: newDonationAmount });
         });
@@ -476,7 +476,7 @@ function calculateDonationsToCharities(charity, user, donation){
   console.log('in calculateDonationsToCharities');
 
   let donationsToCharityByUser = db.collection('donationsToCharities')
-    .doc(charity).collection('donationsToCharity').doc(user); //.collection('donations').doc(user);
+    .doc(charity).collection('donationsToCharity').doc(user);
 
     donationsToCharityByUser.get()
   .then((charityDoc) => {
@@ -514,7 +514,7 @@ function storeUserDonationsToCharities(charity, user, donation){
       db.runTransaction(t => {
         return t.get(donationByUserDoc)
             .then(doc => {
-                var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + donation : donation;
+                var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + (donation) : +(donation);
                 newDonationAmount = +(newDonationAmount.toFixed(2));
                 t.update(donationByUserDoc, { [charity]: newDonationAmount });
             });
@@ -522,6 +522,19 @@ function storeUserDonationsToCharities(charity, user, donation){
     }
   })
 
+
+
+}
+
+
+function addDirectDonation(charity, user, amount){
+
+  console.log('in addDirectDonation');
+  let date = new Date();
+  let month = `${date.getFullYear()}-0${date.getMonth() + 1}`;
+  singleUpdateMonthlyDonations(month, user, amount);
+  calculateDonationsToCharities(charity, user, amount);
+  storeUserDonationsToCharities(charity, user, amount);
 
 
 }
