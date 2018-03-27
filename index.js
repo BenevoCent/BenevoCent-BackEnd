@@ -9,6 +9,8 @@ const firebase = require('firebase');
 const uuidv4 = require('uuid/v4');
 const axios = require('axios');
 require('firebase/firestore');
+const stripe = require("stripe")("pk_test_7NDxNFwTXZI5iGsCursLGPh2");
+
 
 
 const APP_PORT = envvar.number('APP_PORT', 8000);
@@ -59,6 +61,16 @@ app.use(bodyParser.urlencoded({
   extended: false
 }));
 app.use(bodyParser.json());
+
+
+app.use(function(request, response, next) {
+  response.header('Access-Control-Allow-Origin', 'http://localhost:3000')
+  response.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept')
+  response.header('Access-Control-Allow-Credentials', 'true')
+  response.header('Access-Control-Allow-Methods', '*')
+  next();
+});
+
 
 app.get('/', function(request, response, next) {
   response.render('index.ejs', {
@@ -243,6 +255,26 @@ app.post('/orderData', (request, response) => {
   })
 
 });
+
+app.post('/stripeTransaction', (request, response) => {
+  console.log('in post stripeTransaction');
+
+  const token = request.body.stripeToken; // Using Express
+
+  // Charge the user's card:
+  stripe.charges.create({
+    amount: request.body.amount,
+    currency: "usd",
+    description: "Example charge",
+    source: token,
+  }, function(err, charge) {
+    console.log('worked', charge);
+    // asynchronously called
+  });
+
+
+
+})
 
 
 function generateDonation(amount){
