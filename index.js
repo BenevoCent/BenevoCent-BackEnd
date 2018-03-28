@@ -9,7 +9,7 @@ const firebase = require('firebase');
 const uuidv4 = require('uuid/v4');
 const axios = require('axios');
 require('firebase/firestore');
-const stripe = require("stripe")("sk_test_qDwtCkHYi6OPMrNJRpdEQxlu");
+const stripe = require("stripe")("SECRET");
 
 
 
@@ -178,6 +178,13 @@ app.post('/transactions', function(request, response, next) {
 app.post('/newPurchase', function(request, response, next) {
 
   let trans = addSingleTransaction(request.body);
+
+  stripe.invoiceItems.create({
+    amount: +(request.body.amount),
+    currency: 'usd',
+    customer: request.body.uid,
+    description: 'donation',
+  });
   response.json(trans);
 
 });
@@ -269,11 +276,39 @@ app.post('/stripeTransaction', (request, response) => {
   }, function(err, charge) {
     console.log('charge', charge);
     console.log('err', err);
+
     addDirectDonation(charityId, request.body.userId, request.body.amount);
 
   });
 
 })
+
+app.post('/subscribeCustomer', (request, response) => {
+  stripe.subscriptions.create({
+    customer: request.uid,
+    items: [
+      {
+        plan: "prod_CZgErZZBE64HLo",
+      },
+    ]
+  }, function(err, subscription) {
+      // asynchronously called
+    }
+  );
+})
+
+// app.post('/stripeUpdatePlan', (request, response) => {
+//   stripe.plans.create({
+//     amount: 5000,
+//     interval: "month",
+//     product: {
+//       name: "Benevocent Donations"
+//     },
+//     currency: "usd",
+//   }, function(err, plan) {
+//     // asynchronously called
+//   });
+// })
 
 
 function generateDonation(amount){
