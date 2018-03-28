@@ -166,7 +166,6 @@ app.post('/transactions', function(request, response, next) {
         error: error
       });
     }
-    console.log('pulled ' + transactionsResponse.transactions.length + ' transactions');
     addBulkTransactions(transactionsResponse, request.body.uid);
 
     response.json(transactionsResponse);
@@ -409,14 +408,10 @@ function updateTotalDonations(donation, uid){
 
   let userDoc = db.collection('users').doc(uid);
 
-  console.log('donation type', typeof donation);
-
   db.runTransaction(t => {
     return t.get(userDoc)
         .then(doc => {
-          console.log('doc.data().totalDonations', doc.data().totalDonations);
             var newDonationAmount =  doc.data().totalDonations ? +(doc.data().totalDonations) + +(donation) : +(donation);
-            console.log('newDonationAmount', newDonationAmount, 'typeof', typeof newDonationAmount);
             newDonationAmount = +(newDonationAmount.toFixed(2));
             t.update(userDoc, { totalDonations: newDonationAmount });
         });
@@ -473,7 +468,6 @@ function generateEmptyGarden(specifiedMonth, uid){
 
 function calculateDonationsToCharities(charity, user, donation){
 
-  console.log('in calculateDonationsToCharities');
 
   let donationsToCharityByUser = db.collection('donationsToCharities')
     .doc(charity).collection('donationsToCharity').doc(user);
@@ -499,8 +493,6 @@ function calculateDonationsToCharities(charity, user, donation){
 
 function storeUserDonationsToCharities(charity, user, donation){
 
-  console.log('in storeUserDonationsToCharities');
-
   let donationByUserDoc = db.collection('donationsFromUsers')
     .doc(user);
 
@@ -522,20 +514,18 @@ function storeUserDonationsToCharities(charity, user, donation){
     }
   })
 
-
-
 }
 
 
 function addDirectDonation(charity, user, amount){
 
-  console.log('in addDirectDonation');
+  amount = amount / 100;
+
   let date = new Date();
   let month = `${date.getFullYear()}-0${date.getMonth() + 1}`;
   singleUpdateMonthlyDonations(month, user, amount);
   calculateDonationsToCharities(charity, user, amount);
   storeUserDonationsToCharities(charity, user, amount);
-
 
 }
 
