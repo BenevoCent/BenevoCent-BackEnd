@@ -67,7 +67,7 @@ app.use(function(request, response, next) {
   response.header('Access-Control-Allow-Origin', 'http://localhost:3000');
   response.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   response.header('Access-Control-Allow-Credentials', 'true');
-  response.header('Authorization: Basic sk_test_qDwtCkHYi6OPMrNJRpdEQxlu');
+  //response.header('Authorization: Basic SECRET');
   response.header('Access-Control-Allow-Methods', '*');
   next();
 });
@@ -85,7 +85,7 @@ app.post('/get_access_token', function(request, response, next) {
   console.log('PUBLIC_TOKEN', PUBLIC_TOKEN);
   client.exchangePublicToken(PUBLIC_TOKEN, function(error, tokenResponse) {
     if (error !== null) {
-      var msg = 'Could not exchange public_token!';
+      let msg = 'Could not exchange public_token!';
       console.log(msg + '\n' + error);
       return response.json({
         error: msg
@@ -446,7 +446,7 @@ function updateTotalDonations(donation, uid){
   db.runTransaction(t => {
     return t.get(userDoc)
         .then(doc => {
-            var newDonationAmount =  doc.data().totalDonations ? +(doc.data().totalDonations) + +(donation) : +(donation);
+            let newDonationAmount =  doc.data().totalDonations ? +(doc.data().totalDonations) + +(donation) : +(donation);
             newDonationAmount = +(newDonationAmount.toFixed(2));
             t.update(userDoc, { totalDonations: newDonationAmount });
         });
@@ -517,7 +517,7 @@ function calculateDonationsToCharities(charity, user, donation){
       db.runTransaction(t => {
         return t.get(donationsToCharityByUser)
             .then(doc => {
-                var newDonationAmount =  doc.data() ? +(doc.data().totalDonations) + donation : donation;
+                let newDonationAmount =  doc.data() ? +(doc.data().totalDonations) + donation : donation;
                 newDonationAmount = +(newDonationAmount.toFixed(2));
                 t.update(donationsToCharityByUser, { 'totalDonations': newDonationAmount });
             });
@@ -541,7 +541,7 @@ function storeUserDonationsToCharities(charity, user, donation){
       db.runTransaction(t => {
         return t.get(donationByUserDoc)
             .then(doc => {
-                var newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + (donation) : +(donation);
+                let newDonationAmount =  doc.data()[charity] ? +(doc.data()[charity]) + (donation) : +(donation);
                 newDonationAmount = +(newDonationAmount.toFixed(2));
                 t.update(donationByUserDoc, { [charity]: newDonationAmount });
             });
