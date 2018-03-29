@@ -9,9 +9,7 @@ const firebase = require('firebase');
 const uuidv4 = require('uuid/v4');
 const axios = require('axios');
 require('firebase/firestore');
-const stripe = require("stripe")("SECRET");
-
-
+const stripe = require("stripe")("sk_live_tSgZNTuzO1Gi98ujScuP4n6S");
 
 const APP_PORT = envvar.number('APP_PORT', 8000);
 const PLAID_CLIENT_ID = envvar.string('PLAID_CLIENT_ID');
@@ -67,7 +65,6 @@ app.use(function(request, response, next) {
   response.header('Access-Control-Allow-Origin', 'http://localhost:3000');
   response.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   response.header('Access-Control-Allow-Credentials', 'true');
-  //response.header('Authorization: Basic SECRET');
   response.header('Access-Control-Allow-Methods', '*');
   next();
 });
@@ -284,6 +281,7 @@ app.post('/stripeTransaction', (request, response) => {
 })
 
 app.post('/subscribeCustomer', (request, response) => {
+  console.log('in subscribeCustomer');
   stripe.subscriptions.create({
     customer: request.uid,
     items: [
@@ -292,6 +290,10 @@ app.post('/subscribeCustomer', (request, response) => {
       },
     ]
   }, function(err, subscription) {
+
+    console.log('err', err);
+    console.log('subscription', subscription);
+
       // asynchronously called
     }
   );
@@ -562,6 +564,71 @@ function addDirectDonation(charity, user, amount){
   calculateDonationsToCharities(charity, user, amount);
   storeUserDonationsToCharities(charity, user, amount);
 
+}
+
+
+function makeNewPlants(numNewPlots, emptyPlotArr, gardenRef, user){
+
+  emptyPlotArr = fisherYatesShuffle(emptyPlotArr);
+
+  db.collection('users')
+  .doc(user)
+  .get()
+  .then(doc => {
+    let seedling = doc.data()[selectedSeedling];
+    let obj;
+
+    for(let i = 0; i < numNewPlots; i++){
+      obj[emptyPlotArr.shift()] = seedling;
+    }
+    
+    gardenRef.update(obj);
+  })
+  
+}
+
+function compareGardenToDonations(user, monthlyDonation){
+  let numPlants = monthlyDonation / 5;
+  let date = new Date();
+  let numPlots = 0;
+  let emptyPlotArr = [];
+
+  let gardenRef = db.collection('gardens')
+    .doc(user)
+    .collection('user_gardens')
+    .doc(`${date.getFullYear()}-0${date.getMonth() + 1}`);
+
+  gardenRef.get()
+  .then(doc => {
+    
+    for (const plot in doc.data()){
+      if (doc.data()[plot] === null){
+        emptyPlotArr.push(plot);
+      } else{
+        numPlots++;
+      }
+    }
+    if (numPlants > numPlots) makeNewPlants(numPlants - numPlots, emptyPlotArr, gardenRef, user);
+
+  })
+
+}
+
+
+function fisherYatesShuffle(array) {
+  var currentIndex = array.length, temporaryValue, randomIndex;
+
+  while (0 !== currentIndex) {
+
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
 }
 
 
