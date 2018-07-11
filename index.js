@@ -1,24 +1,23 @@
 'use strict'
 
-const envvar = require('envvar')
 const express = require('express')
 const bodyParser = require('body-parser')
 const moment = require('moment')
-const plaid = require('plaid')
+const Plaid = require('plaid')
 const firebase = require('firebase')
 const uuidv4 = require('uuid/v4')
 const axios = require('axios')
 require('firebase/firestore')
 const stripe = require('stripe')('SECRET')
 
-const { firebaseSettings, plaidSettings } = require('./secrets')
+const { firebaseSettings, sandboxPlaidSettings } = require('./secrets')
 
 
-const APP_PORT = envvar.number('APP_PORT', 8000)
-const PLAID_CLIENT_ID = envvar.string('PLAID_CLIENT_ID')
-const PLAID_SECRET = envvar.string('PLAID_SECRET')
-const PLAID_PUBLIC_KEY = envvar.string('PLAID_PUBLIC_KEY')
-const PLAID_ENV = envvar.string('PLAID_ENV', 'development')
+const APP_PORT = sandboxPlaidSettings.APP_PORT
+const PLAID_CLIENT_ID = sandboxPlaidSettings.PLAID_CLIENT_ID
+const PLAID_SECRET = sandboxPlaidSettings.PLAID_SECRET
+const PLAID_PUBLIC_KEY = sandboxPlaidSettings.PLAID_PUBLIC_KEY
+const PLAID_ENV = sandboxPlaidSettings.PLAID_ENV
 
 console.log('the stuff', APP_PORT, PLAID_CLIENT_ID, PLAID_SECRET, PLAID_PUBLIC_KEY, PLAID_ENV)
 
@@ -43,11 +42,11 @@ let PUBLIC_TOKEN = null
 let ITEM_ID = null
 
 // Initialize the Plaid client
-const client = new plaid.Client(
+const client = new Plaid.Client(
   PLAID_CLIENT_ID,
   PLAID_SECRET,
   PLAID_PUBLIC_KEY,
-  plaid.environments[PLAID_ENV]
+  Plaid.environments[PLAID_ENV]
 )
 
 const app = express()
@@ -68,6 +67,7 @@ app.use(function(request, response, next) {
   next()
 })
 
+console.log('about to do my own plaid.create')
 
 app.get('/', function(request, response, next) {
   response.render('index.ejs', {
@@ -245,19 +245,19 @@ app.post('/newGarden', (request, response) => {
 })
 
 //front end code to get data for community garden
-app.post('/orderData', (request, response) => {
-  let charityRef = db.collection('donationsToCharities').doc(request.body.charity).collection('donationsToCharity')
+// app.post('/orderData', (request, response) => {
+//   let charityRef = db.collection('donationsToCharities').doc(request.body.charity).collection('donationsToCharity')
 
-  charityRef.orderBy('totalDonations').limit(9).get()
-  .then(snapshot => {
-    snapshot.forEach((doc) => {
-      console.log(doc.data())
-    })
+//   charityRef.orderBy('totalDonations').limit(9).get()
+//   .then(snapshot => {
+//     snapshot.forEach((doc) => {
+//       console.log(doc.data())
+//     })
 
-    response.send('coolio')
-  })
+//     response.send('coolio')
+//   })
 
-})
+// })
 
 app.post('/stripeTransaction', (request, response) => {
 
